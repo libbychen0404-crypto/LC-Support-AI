@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import HomePage from '../app/page';
 
 vi.mock('next/link', () => ({
@@ -10,6 +10,10 @@ vi.mock('next/link', () => ({
     </a>
   )
 }));
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('home page demo entry', () => {
   it('renders clear demo entry actions for customer and agent roles', async () => {
@@ -33,5 +37,19 @@ describe('home page demo entry', () => {
     expect(html).toContain('Demo access setup is incomplete');
     expect(html).toContain('customer demo account is missing its support-platform identity mapping');
     expect(html).toContain('demo_identity_missing');
+  });
+
+  it('hides the public agent demo entry on production deployments unless explicitly enabled', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', '');
+
+    const html = renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+
+    expect(html).toContain('Continue as Customer');
+    expect(html).not.toContain('Continue as Agent');
+    expect(html).not.toContain('Review Agent Workflow');
+    expect(html).toContain('seeded customer account');
+    expect(html).not.toContain('seeded customer or agent account');
+    expect(html).not.toContain('href="/setup"');
   });
 });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAgentAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { classifyAdminRouteExecutionError, createAdminRouteExecutionResolver } from '@/lib/adminRouteExecution';
+import { getClientVisibleErrorDetail } from '@/lib/security';
 import { ArchiveEligibilityError } from '@/lib/supportService';
 import type { CasePriority, CaseStatus, EscalationState, HandoffStatus } from '@/lib/types';
 
@@ -49,7 +50,9 @@ export async function GET(request: Request) {
       {
         error: classified.error,
         errorCode: classified.errorCode,
-        detail: classified.detail
+        ...(getClientVisibleErrorDetail(classified.detail)
+          ? { detail: getClientVisibleErrorDetail(classified.detail) }
+          : {})
       },
       { status: classified.status }
     );
@@ -143,7 +146,9 @@ export async function POST(request: Request) {
       {
         error: classified.error,
         errorCode: classified.errorCode,
-        detail: classified.detail
+        ...(getClientVisibleErrorDetail(classified.detail)
+          ? { detail: getClientVisibleErrorDetail(classified.detail) }
+          : {})
       },
       { status: classified.status }
     );

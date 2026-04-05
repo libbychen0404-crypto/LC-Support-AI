@@ -40,6 +40,7 @@ export class DemoAuthError extends Error {
     readonly code:
       | 'demo_role_invalid'
       | 'demo_credentials_missing'
+      | 'demo_role_disabled'
       | 'demo_sign_in_failed'
       | 'demo_identity_missing'
       | 'demo_identity_inactive'
@@ -67,6 +68,18 @@ export type DemoSessionResult = {
 
 export function isDemoEntryRole(value: string): value is DemoEntryRole {
   return (DEMO_ENTRY_ROLES as readonly string[]).includes(value);
+}
+
+export function isPublicDemoRoleEnabled(role: DemoEntryRole) {
+  if (process.env.NODE_ENV !== 'production') {
+    return true;
+  }
+
+  if (role === 'customer') {
+    return true;
+  }
+
+  return process.env.PUBLIC_AGENT_DEMO_ENTRY_ENABLED === 'true';
 }
 
 function getCookieSecurityOptions() {
@@ -133,6 +146,14 @@ export function getDemoSignInFailureViewModel(
         operatorHint:
           'Add the demo email/password variables in .env.local and make sure the matching Supabase Auth user exists.'
       };
+    case 'demo_role_disabled':
+      return {
+        code,
+        title: 'This demo entry is not available on the public deployment',
+        message: `The ${roleLabel} demo workspace is not enabled for public access on this environment.`,
+        operatorHint:
+          'Enable PUBLIC_AGENT_DEMO_ENTRY_ENABLED only when you intentionally want the public site to expose the seeded agent workflow.'
+      };
     case 'demo_sign_in_failed':
       return {
         code,
@@ -188,6 +209,13 @@ export function getDemoSignInFailureViewModel(
 export async function createDemoSession(role: DemoEntryRole): Promise<DemoSessionResult> {
   if (!isDemoEntryRole(role)) {
     throw new DemoAuthError('The requested demo entry role is invalid.', 'demo_role_invalid');
+  }
+
+  if (!isPublicDemoRoleEnabled(role)) {
+    throw new DemoAuthError(
+      `The ${role} demo entry is disabled on this environment.`,
+      'demo_role_disabled'
+    );
   }
 
   const config = getDemoCredentialConfig(role);

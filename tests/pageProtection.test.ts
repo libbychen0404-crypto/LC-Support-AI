@@ -32,6 +32,10 @@ vi.mock('@/components/handoff/HumanSupportWorkspace', () => ({
   HumanSupportWorkspace: ({ caseId }: { caseId: string }) => `HumanSupportWorkspace:${caseId}`
 }));
 
+vi.mock('@/components/setup/SetupCheckPanel', () => ({
+  SetupCheckPanel: () => 'SetupCheckPanel'
+}));
+
 function anonymousAuth(): AuthContext {
   return {
     isAuthenticated: false,
@@ -71,6 +75,7 @@ function agentAuth(): AuthContext {
 describe('page protection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('redirects anonymous visitors away from /chat', async () => {
@@ -147,6 +152,27 @@ describe('page protection', () => {
     const { default: HumanSupportPage } = await import('../app/human-support/page');
 
     const result = await HumanSupportPage({ searchParams: Promise.resolve({ caseId: 'case-1' }) });
+
+    expect(result).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('redirects anonymous visitors away from /setup in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    resolveServerAuthContextMock.mockResolvedValue(anonymousAuth());
+    vi.resetModules();
+    const { default: SetupPage } = await import('../app/setup/page');
+
+    await expect(SetupPage()).rejects.toThrow('REDIRECT:/');
+  });
+
+  it('allows signed-in agents into /setup in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    resolveServerAuthContextMock.mockResolvedValue(agentAuth());
+    vi.resetModules();
+    const { default: SetupPage } = await import('../app/setup/page');
+
+    const result = await SetupPage();
 
     expect(result).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalled();

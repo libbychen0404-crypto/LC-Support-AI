@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getDemoSignInFailureViewModel } from '@/lib/demoAuth';
+import { getDemoSignInFailureViewModel, isPublicDemoRoleEnabled } from '@/lib/demoAuth';
 
 const overviewCards = [
   {
@@ -60,6 +60,11 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = (await searchParams) ?? {};
   const demoSignInError = getDemoSignInFailureViewModel(params.demoError, params.demoRole);
+  const customerDemoEnabled = isPublicDemoRoleEnabled('customer');
+  const agentDemoEnabled = isPublicDemoRoleEnabled('agent');
+  const demoEntryNote = agentDemoEnabled
+    ? 'Demo entry signs you into a seeded customer or agent account so the protected workspaces open normally.'
+    : 'Demo entry signs you into a seeded customer account so the protected workspace opens normally.';
 
   return (
     <main className="home-shell">
@@ -84,11 +89,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </a>
         </nav>
 
-        <div className="site-header-actions">
-          <Link href="/setup" className="secondary-button">
-            Setup Check
-          </Link>
-        </div>
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="site-header-actions">
+            <Link href="/setup" className="secondary-button">
+              Setup Check
+            </Link>
+          </div>
+        )}
       </header>
 
       {demoSignInError && (
@@ -114,21 +121,25 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </p>
 
           <div className="home-actions">
-            <form action="/api/demo-sign-in" method="post">
-              <input type="hidden" name="role" value="customer" />
-              <button type="submit" className="primary-button">
-                Continue as Customer
-              </button>
-            </form>
-            <form action="/api/demo-sign-in" method="post">
-              <input type="hidden" name="role" value="agent" />
-              <button type="submit" className="secondary-button">
-                Continue as Agent
-              </button>
-            </form>
+            {customerDemoEnabled && (
+              <form action="/api/demo-sign-in" method="post">
+                <input type="hidden" name="role" value="customer" />
+                <button type="submit" className="primary-button">
+                  Continue as Customer
+                </button>
+              </form>
+            )}
+            {agentDemoEnabled && (
+              <form action="/api/demo-sign-in" method="post">
+                <input type="hidden" name="role" value="agent" />
+                <button type="submit" className="secondary-button">
+                  Continue as Agent
+                </button>
+              </form>
+            )}
           </div>
 
-          <div className="inline-note">Demo entry signs you into a seeded customer or agent account so the protected workspaces open normally.</div>
+          <div className="inline-note">{demoEntryNote}</div>
         </div>
 
         <div className="home-hero-sidebar">
@@ -237,18 +248,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           control inside one support product.
         </p>
         <div className="button-cluster">
-          <form action="/api/demo-sign-in" method="post">
-            <input type="hidden" name="role" value="customer" />
-            <button type="submit" className="primary-button">
-              Start Customer Demo
-            </button>
-          </form>
-          <form action="/api/demo-sign-in" method="post">
-            <input type="hidden" name="role" value="agent" />
-            <button type="submit" className="secondary-button">
-              Review Agent Workflow
-            </button>
-          </form>
+          {customerDemoEnabled && (
+            <form action="/api/demo-sign-in" method="post">
+              <input type="hidden" name="role" value="customer" />
+              <button type="submit" className="primary-button">
+                Start Customer Demo
+              </button>
+            </form>
+          )}
+          {agentDemoEnabled && (
+            <form action="/api/demo-sign-in" method="post">
+              <input type="hidden" name="role" value="agent" />
+              <button type="submit" className="secondary-button">
+                Review Agent Workflow
+              </button>
+            </form>
+          )}
         </div>
       </section>
     </main>

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createDemoSession, getDemoSignInCookieEntries, getDemoSignInErrorCode, isDemoEntryRole } from '@/lib/demoAuth';
+import {
+  createDemoSession,
+  getDemoSignInCookieEntries,
+  getDemoSignInErrorCode,
+  isDemoEntryRole,
+  isPublicDemoRoleEnabled
+} from '@/lib/demoAuth';
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -8,6 +14,16 @@ export async function POST(request: Request) {
 
   if (!isDemoEntryRole(role)) {
     return NextResponse.redirect(new URL('/?demoError=demo_role_invalid', request.url));
+  }
+
+  if (!isPublicDemoRoleEnabled(role)) {
+    return NextResponse.json(
+      {
+        error: 'This demo entry is not enabled on the public deployment.',
+        errorCode: 'demo_role_disabled'
+      },
+      { status: 403 }
+    );
   }
 
   try {
@@ -21,6 +37,17 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     const errorCode = getDemoSignInErrorCode(error);
+
+    if (errorCode === 'demo_role_disabled') {
+      return NextResponse.json(
+        {
+          error: 'This demo entry is not enabled on the public deployment.',
+          errorCode
+        },
+        { status: 403 }
+      );
+    }
+
     const nextUrl = new URL('/', request.url);
     nextUrl.searchParams.set('demoError', errorCode);
     nextUrl.searchParams.set('demoRole', role);

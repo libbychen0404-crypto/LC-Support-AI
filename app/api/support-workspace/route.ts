@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireCustomerAuthContext, resolveAuthorizedCustomerId, resolveRequestAuthContext } from '@/lib/auth';
 import { classifyCustomerRouteError, createCustomerRouteExecutionResolver } from '@/lib/customerRouteExecution';
+import { getClientVisibleErrorDetail } from '@/lib/security';
 import { toCustomerVisibleFile } from '@/lib/serializers';
 import { validateProfileInput } from '@/lib/validation';
 import type { CustomerFile, CustomerProfile, CustomerVisibleFile } from '@/lib/types';
@@ -128,7 +129,9 @@ export async function POST(request: Request) {
       {
         error: classified.error,
         errorCode: classified.errorCode,
-        detail: classified.detail
+        ...(getClientVisibleErrorDetail(classified.detail)
+          ? { detail: getClientVisibleErrorDetail(classified.detail) }
+          : {})
       },
       { status: classified.status }
     );

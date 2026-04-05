@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
+import { AuthError, requireAuthenticatedAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { getFallbackReply } from '@/lib/helpers';
 import type { AIReplyPayload } from '@/lib/types';
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   let body: AIReplyPayload | null = null;
 
   try {
+    requireAuthenticatedAuthContext(resolveRequestAuthContext(request));
     body = (await request.json()) as AIReplyPayload;
 
     if (!client) {
@@ -85,6 +87,16 @@ ${formatRecentMessages(body.recentMessages)}
       reply: response.output_text?.trim() || getFallbackReply(body.actionType, body.pendingFieldLabel)
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        {
+          error: 'Sign in before using the AI support assistant on this workspace.',
+          errorCode: error.code
+        },
+        { status: error.status }
+      );
+    }
+
     console.error('AI reply route error:', error);
 
     return NextResponse.json({

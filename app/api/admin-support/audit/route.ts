@@ -3,6 +3,7 @@ import { requireAgentAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { classifyAdminRouteExecutionError, createAdminRouteExecutionResolver } from '@/lib/adminRouteExecution';
 import { listAuditLogsForCase } from '@/lib/auditStorageSupabase';
 import { formatAdminAuditTimelineEvent } from '@/lib/auditViewer';
+import { getClientVisibleErrorDetail } from '@/lib/security';
 
 const adminRouteExecutionResolver = createAdminRouteExecutionResolver();
 
@@ -34,7 +35,9 @@ export async function GET(request: Request) {
       {
         error: classified.error,
         errorCode: classified.errorCode,
-        detail: classified.detail
+        ...(getClientVisibleErrorDetail(classified.detail)
+          ? { detail: getClientVisibleErrorDetail(classified.detail) }
+          : {})
       },
       { status: classified.status }
     );

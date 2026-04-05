@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
+import { AuthError, requireAuthenticatedAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { buildSummary } from '@/lib/caseLogic';
 import { getFallbackReply } from '@/lib/helpers';
 import type { AICaseInsights, AICaseInsightsPayload, CustomerProfile } from '@/lib/types';
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
   let body: AICaseInsightsPayload | null = null;
 
   try {
+    requireAuthenticatedAuthContext(resolveRequestAuthContext(request));
     body = (await request.json()) as AICaseInsightsPayload;
 
     if (!client) {
@@ -152,6 +154,16 @@ ${formatRecentMessages(body.recentMessages)}
 
     return NextResponse.json(JSON.parse(outputText) as AICaseInsights);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        {
+          error: 'Sign in before requesting AI-generated case insights.',
+          errorCode: error.code
+        },
+        { status: error.status }
+      );
+    }
+
     console.error('AI case insights route error:', error);
     return NextResponse.json(body ? getFallbackInsights(body) : { summary: '', caseNote: '', customerUpdate: '' });
   }

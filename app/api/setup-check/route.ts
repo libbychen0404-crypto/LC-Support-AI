@@ -1,11 +1,27 @@
 import { NextResponse } from 'next/server';
+import { AuthError } from '@/lib/auth';
+import { requireProductionSetupAccess, isProductionRuntime } from '@/lib/security';
 import { runSetupCheck } from '@/lib/setupCheck';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    requireProductionSetupAccess(request);
     const result = await runSetupCheck();
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        {
+          error:
+            error.status === 401
+              ? 'Sign in as a support agent before opening the setup diagnostics.'
+              : 'Only support agents can open the setup diagnostics on this environment.',
+          errorCode: error.code
+        },
+        { status: error.status }
+      );
+    }
+
     console.error('setup-check route error:', error);
 
     return NextResponse.json(
@@ -39,7 +55,8 @@ export async function GET() {
           demoSignInEnvReady: false
         },
         ready: false,
-        details: [error instanceof Error ? error.message : 'Setup check failed.']
+        details: [isProductionRuntime() ? 'Setup check failed.' : error instanceof Error ? error.message : 'Setup check failed.'],
+        advisories: []
       },
       { status: 500 }
     );

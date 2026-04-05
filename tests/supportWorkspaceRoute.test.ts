@@ -146,6 +146,7 @@ function makeFile(): CustomerFile {
 
 describe('support-workspace route', () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     Object.values(serviceMocks).forEach((mock) => mock.mockReset());
     routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockReset();
     process.env.AUTH_SESSION_SECRET = 'test-auth-secret';
@@ -309,6 +310,28 @@ describe('support-workspace route', () => {
     expect(response.status).toBe(500);
     const payload = (await response.json()) as { errorCode: string };
     expect(payload.errorCode).toBe('schema_mismatch');
+  });
+
+  it('suppresses raw internal detail from production customer API errors', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockRejectedValue(
+      new Error('column cases.issue_type does not exist')
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/support-workspace', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'load'
+        }),
+        headers: { 'Content-Type': 'application/json', cookie: makeCustomerCookie() }
+      })
+    );
+
+    expect(response.status).toBe(500);
+    const payload = (await response.json()) as Record<string, unknown>;
+    expect(payload.errorCode).toBe('schema_mismatch');
+    expect(payload).not.toHaveProperty('detail');
   });
 
   it('returns an identity_mapping_missing code when the app user mapping is absent', async () => {

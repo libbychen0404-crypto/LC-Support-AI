@@ -108,6 +108,7 @@ function makeExecutionContext(overrides: Partial<AgentAuthContext> = {}) {
 
 describe('admin-support route guards', () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     Object.values(serviceMocks).forEach((mock) => mock.mockReset());
     routeExecutionMocks.resolveRequestAdminRouteExecutionContext.mockReset();
     process.env.AUTH_SESSION_SECRET = 'test-auth-secret';
@@ -436,6 +437,29 @@ describe('admin-support route guards', () => {
     const payload = (await response.json()) as { error: string; detail: string };
     expect(payload.error).toBe('We could not assign this case to you right now. Refresh the dashboard and try again.');
     expect(payload.detail).toBe('Cannot coerce the result to a single JSON object');
+  });
+
+  it('suppresses raw internal detail from production admin API errors', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    routeExecutionMocks.resolveRequestAdminRouteExecutionContext.mockResolvedValue(makeExecutionContext());
+    serviceMocks.updateCaseOperations.mockRejectedValue(new Error('Cannot coerce the result to a single JSON object'));
+
+    const response = await POST(
+      new Request('http://localhost/api/admin-support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie: makeAgentCookie() },
+        body: JSON.stringify({
+          customerId: 'demo-customer-001',
+          caseId: 'case-1',
+          status: 'Investigating'
+        })
+      })
+    );
+
+    expect(response.status).toBe(500);
+    const payload = (await response.json()) as Record<string, unknown>;
+    expect(payload.error).toBe('We could not save this case update right now. Refresh the dashboard and try again.');
+    expect(payload).not.toHaveProperty('detail');
   });
 
   it('lets an agent archive a closed case through the user-scoped execution path', async () => {
