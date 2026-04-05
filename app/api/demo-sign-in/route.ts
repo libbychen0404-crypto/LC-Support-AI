@@ -3,8 +3,7 @@ import {
   createDemoSession,
   getDemoSignInCookieEntries,
   getDemoSignInErrorCode,
-  isDemoEntryRole,
-  isPublicDemoRoleEnabled
+  isDemoEntryRole
 } from '@/lib/demoAuth';
 
 export async function POST(request: Request) {
@@ -16,14 +15,8 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL('/?demoError=demo_role_invalid', request.url));
   }
 
-  if (!isPublicDemoRoleEnabled(role)) {
-    return NextResponse.json(
-      {
-        error: 'This demo entry is not enabled on the public deployment.',
-        errorCode: 'demo_role_disabled'
-      },
-      { status: 403 }
-    );
+  if (process.env.PUBLIC_AGENT_DEMO_ENTRY_ENABLED !== 'true' && role === 'agent') {
+    return NextResponse.json({ error: 'Agent demo disabled' }, { status: 403 });
   }
 
   try {
@@ -39,13 +32,7 @@ export async function POST(request: Request) {
     const errorCode = getDemoSignInErrorCode(error);
 
     if (errorCode === 'demo_role_disabled') {
-      return NextResponse.json(
-        {
-          error: 'This demo entry is not enabled on the public deployment.',
-          errorCode
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Agent demo disabled' }, { status: 403 });
     }
 
     const nextUrl = new URL('/', request.url);

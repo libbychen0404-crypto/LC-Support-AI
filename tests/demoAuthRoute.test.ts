@@ -112,7 +112,7 @@ describe('demo auth routes', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      errorCode: 'demo_role_disabled'
+      error: 'Agent demo disabled'
     });
     expect(createDemoSessionMock).not.toHaveBeenCalled();
   });
