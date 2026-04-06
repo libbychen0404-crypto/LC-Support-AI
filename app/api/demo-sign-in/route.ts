@@ -24,6 +24,11 @@ export async function POST(request: Request) {
     typeof body === 'object' && body !== null && 'role' in body && typeof body.role === 'string'
       ? body.role
       : '';
+  const accessCode =
+    typeof body === 'object' && body !== null && 'accessCode' in body && typeof body.accessCode === 'string'
+      ? body.accessCode
+      : '';
+  const expectedAgentAccessCode = process.env.AGENT_DEMO_ACCESS_CODE ?? '';
 
   if (!isDemoEntryRole(role)) {
     return new Response(JSON.stringify({ error: 'Invalid role' }), {
@@ -32,15 +37,17 @@ export async function POST(request: Request) {
     });
   }
 
-  if (process.env.PUBLIC_AGENT_DEMO_ENTRY_ENABLED !== 'true' && role === 'agent') {
-    return new Response(JSON.stringify({ error: 'Agent demo disabled' }), {
+  if (role === 'agent' && (!accessCode || !expectedAgentAccessCode || accessCode !== expectedAgentAccessCode)) {
+    return new Response(JSON.stringify({ error: 'Invalid access code' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   try {
-    const session = await createDemoSession(role);
+    const session = await createDemoSession(role, {
+      skipPublicEntryCheck: role === 'agent'
+    });
     const response = NextResponse.redirect(new URL(session.redirectTo, request.url));
 
     for (const cookie of getDemoSignInCookieEntries(session)) {
@@ -51,8 +58,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorCode = getDemoSignInErrorCode(error);
 
-    if (errorCode === 'demo_role_disabled' || role === 'agent') {
-      return new Response(JSON.stringify({ error: 'Agent demo disabled' }), {
+    if (role === 'agent' && errorCode === 'demo_role_disabled') {
+      return new Response(JSON.stringify({ error: 'Invalid access code' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }
       });

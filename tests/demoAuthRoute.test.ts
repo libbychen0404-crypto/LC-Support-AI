@@ -6,7 +6,6 @@ const getDemoSignOutCookieEntriesMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../lib/demoAuth', () => ({
   isDemoEntryRole: (value: string) => value === 'customer' || value === 'agent',
-  isPublicDemoRoleEnabled: (role: string) => role !== 'agent' || process.env.PUBLIC_AGENT_DEMO_ENTRY_ENABLED === 'true',
   createDemoSession: createDemoSessionMock,
   getDemoSignInCookieEntries: getDemoSignInCookieEntriesMock,
   getDemoSignInErrorCode: (error: unknown) =>
@@ -51,7 +50,7 @@ describe('demo auth routes', () => {
   });
 
   it('agent demo entry creates cookies and redirects to /admin', async () => {
-    vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', 'true');
+    vi.stubEnv('AGENT_DEMO_ACCESS_CODE', 'secret-code');
     createDemoSessionMock.mockResolvedValue({
       role: 'agent',
       redirectTo: '/admin',
@@ -71,7 +70,7 @@ describe('demo auth routes', () => {
       new Request('http://localhost:3000/api/demo-sign-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'agent' })
+        body: JSON.stringify({ role: 'agent', accessCode: 'secret-code' })
       })
     );
 
@@ -97,9 +96,8 @@ describe('demo auth routes', () => {
     });
   });
 
-  it('returns the same safe 403 JSON if the agent path somehow fails after the disabled check', async () => {
-    vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', 'true');
-    createDemoSessionMock.mockRejectedValue(new Error('disabled'));
+  it('blocks agent demo sign-in when the access code is missing', async () => {
+    vi.stubEnv('AGENT_DEMO_ACCESS_CODE', 'secret-code');
 
     const { POST } = await import('../app/api/demo-sign-in/route');
     const response = await POST(
@@ -112,26 +110,26 @@ describe('demo auth routes', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Agent demo disabled'
+      error: 'Invalid access code'
     });
+    expect(createDemoSessionMock).not.toHaveBeenCalled();
   });
 
-  it('blocks the public agent demo entry when the production override is not enabled', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', '');
+  it('blocks agent demo sign-in when the access code is wrong', async () => {
+    vi.stubEnv('AGENT_DEMO_ACCESS_CODE', 'secret-code');
 
     const { POST } = await import('../app/api/demo-sign-in/route');
     const response = await POST(
       new Request('http://localhost:3000/api/demo-sign-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'agent' })
+        body: JSON.stringify({ role: 'agent', accessCode: 'wrong-code' })
       })
     );
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Agent demo disabled'
+      error: 'Invalid access code'
     });
     expect(createDemoSessionMock).not.toHaveBeenCalled();
   });

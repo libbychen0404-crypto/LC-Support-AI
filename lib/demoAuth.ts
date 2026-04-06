@@ -66,6 +66,10 @@ export type DemoSessionResult = {
   supabaseAccessToken: string;
 };
 
+type CreateDemoSessionOptions = {
+  skipPublicEntryCheck?: boolean;
+};
+
 export function isDemoEntryRole(value: string): value is DemoEntryRole {
   return (DEMO_ENTRY_ROLES as readonly string[]).includes(value);
 }
@@ -206,12 +210,15 @@ export function getDemoSignInFailureViewModel(
   }
 }
 
-export async function createDemoSession(role: DemoEntryRole): Promise<DemoSessionResult> {
+export async function createDemoSession(
+  role: DemoEntryRole,
+  options: CreateDemoSessionOptions = {}
+): Promise<DemoSessionResult> {
   if (!isDemoEntryRole(role)) {
     throw new DemoAuthError('The requested demo entry role is invalid.', 'demo_role_invalid');
   }
 
-  if (!isPublicDemoRoleEnabled(role)) {
+  if (!options.skipPublicEntryCheck && !isPublicDemoRoleEnabled(role)) {
     throw new DemoAuthError(
       `The ${role} demo entry is disabled on this environment.`,
       'demo_role_disabled'

@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getDemoSignInFailureViewModel, isPublicDemoRoleEnabled } from '@/lib/demoAuth';
+import { DemoSignInButton } from '@/components/shared/DemoSignInButton';
+import { getDemoSignInFailureViewModel } from '@/lib/demoAuth';
 
 const overviewCards = [
   {
@@ -60,11 +61,7 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = (await searchParams) ?? {};
   const demoSignInError = getDemoSignInFailureViewModel(params.demoError, params.demoRole);
-  const customerDemoEnabled = isPublicDemoRoleEnabled('customer');
-  const agentDemoEnabled = isPublicDemoRoleEnabled('agent');
-  const demoEntryNote = agentDemoEnabled
-    ? 'Demo entry signs you into a seeded customer or agent account so the protected workspaces open normally.'
-    : 'Demo entry signs you into a seeded customer account so the protected workspace opens normally.';
+  const demoEntryNote = 'Demo entry signs you into a seeded customer account so the protected workspace opens normally.';
 
   return (
     <main className="home-shell">
@@ -121,22 +118,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </p>
 
           <div className="home-actions">
-            {customerDemoEnabled && (
-              <form action="/api/demo-sign-in" method="post">
-                <input type="hidden" name="role" value="customer" />
-                <button type="submit" className="primary-button">
-                  Continue as Customer
-                </button>
-              </form>
-            )}
-            {agentDemoEnabled && (
-              <form action="/api/demo-sign-in" method="post">
-                <input type="hidden" name="role" value="agent" />
-                <button type="submit" className="secondary-button">
-                  Continue as Agent
-                </button>
-              </form>
-            )}
+            <DemoSignInButton role="customer" label="Continue as Customer" className="primary-button" />
           </div>
 
           <div className="inline-note">{demoEntryNote}</div>
@@ -248,22 +230,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           control inside one support product.
         </p>
         <div className="button-cluster">
-          {customerDemoEnabled && (
-            <form action="/api/demo-sign-in" method="post">
-              <input type="hidden" name="role" value="customer" />
-              <button type="submit" className="primary-button">
-                Start Customer Demo
-              </button>
-            </form>
-          )}
-          {agentDemoEnabled && (
-            <form action="/api/demo-sign-in" method="post">
-              <input type="hidden" name="role" value="agent" />
-              <button type="submit" className="secondary-button">
-                Review Agent Workflow
-              </button>
-            </form>
-          )}
+          <DemoSignInButton role="customer" label="Start Customer Demo" className="primary-button" />
         </div>
       </section>
     </main>

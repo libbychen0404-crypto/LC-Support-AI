@@ -16,12 +16,13 @@ afterEach(() => {
 });
 
 describe('home page demo entry', () => {
-  it('renders clear demo entry actions for customer and agent roles', async () => {
+  it('renders clear customer-only demo entry actions', async () => {
     const html = renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('Continue as Customer');
-    expect(html).toContain('Continue as Agent');
-    expect(html).toContain('/api/demo-sign-in');
+    expect(html).toContain('Start Customer Demo');
+    expect(html).not.toContain('Continue as Agent');
+    expect(html).not.toContain('Review Agent Workflow');
   });
 
   it('renders a clean homepage error notice after demo sign-in fails', async () => {
@@ -39,10 +40,8 @@ describe('home page demo entry', () => {
     expect(html).toContain('demo_identity_missing');
   });
 
-  it('hides the public agent demo entry on production deployments unless explicitly enabled', async () => {
+  it('keeps the public homepage customer-only in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', '');
-
     const html = renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('Continue as Customer');
