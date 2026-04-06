@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import HomePage from '../app/page';
+import DemoPage from '../app/demo/page';
 import InternalAgentLoginPage from '../app/internal-agent-login/page';
 
 vi.mock('next/link', () => ({
@@ -31,8 +31,8 @@ vi.mock('@/components/internal/InternalAgentLoginForm', () => ({
 }));
 
 describe('public entry pages', () => {
-  it('keeps the public homepage customer-only', async () => {
-    const html = renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
+  it('keeps the demo landing page customer-only at /demo', async () => {
+    const html = renderToStaticMarkup(await DemoPage({ searchParams: Promise.resolve({}) }));
 
     expect(html).toContain('Continue as Customer');
     expect(html).toContain('Start Customer Demo');
