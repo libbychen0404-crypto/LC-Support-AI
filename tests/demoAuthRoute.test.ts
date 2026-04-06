@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetRateLimitStore } from '../lib/rateLimit';
 
 const createDemoSessionMock = vi.hoisted(() => vi.fn());
 const getDemoSignInCookieEntriesMock = vi.hoisted(() => vi.fn());
@@ -18,6 +19,7 @@ describe('demo auth routes', () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     vi.stubEnv('NODE_ENV', 'test');
+    resetRateLimitStore();
   });
 
   it('customer demo entry creates cookies and redirects to /chat', async () => {
@@ -181,5 +183,98 @@ describe('demo auth routes', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost:3000/');
     expect(response.headers.get('set-cookie')).toContain('lc_support_session=');
+  });
+
+  it('returns 429 after 5 demo sign-in attempts from the same IP within the window', async () => {
+    createDemoSessionMock.mockResolvedValue({
+      role: 'customer',
+      redirectTo: '/chat',
+      appSessionToken: 'customer-token',
+      supabaseAccessToken: 'customer-access-token'
+    });
+    getDemoSignInCookieEntriesMock.mockReturnValue([
+      {
+        name: 'lc_support_session',
+        value: 'customer-token',
+        options: { path: '/', httpOnly: true }
+      }
+    ]);
+
+    const { POST } = await import('../app/api/demo-sign-in/route');
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await POST(
+        new Request('http://localhost:3000/api/demo-sign-in', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': '203.0.113.10'
+          },
+          body: JSON.stringify({ role: 'customer' })
+        })
+      );
+
+      expect(response.status).toBe(307);
+    }
+
+    const blockedResponse = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.10'
+        },
+        body: JSON.stringify({ role: 'customer' })
+      })
+    );
+
+    expect(blockedResponse.status).toBe(429);
+    await expect(blockedResponse.json()).resolves.toMatchObject({
+      error: 'Too many requests'
+    });
+  });
+
+  it('tracks demo sign-in attempts separately for different IPs', async () => {
+    createDemoSessionMock.mockResolvedValue({
+      role: 'customer',
+      redirectTo: '/chat',
+      appSessionToken: 'customer-token',
+      supabaseAccessToken: 'customer-access-token'
+    });
+    getDemoSignInCookieEntriesMock.mockReturnValue([
+      {
+        name: 'lc_support_session',
+        value: 'customer-token',
+        options: { path: '/', httpOnly: true }
+      }
+    ]);
+
+    const { POST } = await import('../app/api/demo-sign-in/route');
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await POST(
+        new Request('http://localhost:3000/api/demo-sign-in', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': '203.0.113.11'
+          },
+          body: JSON.stringify({ role: 'customer' })
+        })
+      );
+    }
+
+    const separateIpResponse = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.12'
+        },
+        body: JSON.stringify({ role: 'customer' })
+      })
+    );
+
+    expect(separateIpResponse.status).toBe(307);
   });
 });

@@ -5,8 +5,14 @@ import {
   getDemoSignInErrorCode,
   isDemoEntryRole
 } from '@/lib/demoAuth';
+import { checkRateLimit, createRateLimitExceededResponse, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(request: Request) {
+  const rateLimit = checkRateLimit('demo-sign-in', getClientIp(request));
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse(rateLimit);
+  }
+
   const contentType = request.headers.get('content-type') ?? '';
   if (!contentType.toLowerCase().includes('application/json')) {
     return NextResponse.json({ error: 'JSON body required' }, { status: 415 });

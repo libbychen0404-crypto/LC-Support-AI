@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { AuthError, requireAuthenticatedAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { buildSummary } from '@/lib/caseLogic';
 import { getFallbackReply } from '@/lib/helpers';
+import { checkRateLimit, createRateLimitExceededResponse, getClientIp } from '@/lib/rateLimit';
 import type { AICaseInsights, AICaseInsightsPayload, CustomerProfile } from '@/lib/types';
 
 const client = process.env.OPENAI_API_KEY
@@ -83,6 +84,11 @@ export async function POST(request: Request) {
   let body: AICaseInsightsPayload | null = null;
 
   try {
+    const rateLimit = checkRateLimit('ai-case-insights', getClientIp(request));
+    if (!rateLimit.allowed) {
+      return createRateLimitExceededResponse(rateLimit);
+    }
+
     requireAuthenticatedAuthContext(resolveRequestAuthContext(request));
     body = (await request.json()) as AICaseInsightsPayload;
 

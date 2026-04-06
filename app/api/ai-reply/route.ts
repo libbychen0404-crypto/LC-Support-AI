@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
 import { AuthError, requireAuthenticatedAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { getFallbackReply } from '@/lib/helpers';
+import { checkRateLimit, createRateLimitExceededResponse, getClientIp } from '@/lib/rateLimit';
 import type { AIReplyPayload } from '@/lib/types';
 
 const client = process.env.OPENAI_API_KEY
@@ -29,6 +30,11 @@ export async function POST(request: Request) {
   let body: AIReplyPayload | null = null;
 
   try {
+    const rateLimit = checkRateLimit('ai-reply', getClientIp(request));
+    if (!rateLimit.allowed) {
+      return createRateLimitExceededResponse(rateLimit);
+    }
+
     requireAuthenticatedAuthContext(resolveRequestAuthContext(request));
     body = (await request.json()) as AIReplyPayload;
 
