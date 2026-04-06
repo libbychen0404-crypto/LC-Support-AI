@@ -9,6 +9,7 @@ export type AppUserRecord = {
   customerStorageId: string | null;
   agentLabel: string | null;
   isActive: boolean;
+  isDemo: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -457,4 +458,5 @@ export type SetupCheckResult = {
   };
   ready: boolean;
   details: string[];
+  advisories: string[];
 };

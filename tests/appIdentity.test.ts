@@ -46,6 +46,7 @@ describe('app identity mapping helpers', () => {
       customer_id: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
       agent_label: null,
       is_active: true,
+      is_demo: false,
       created_at: '2026-04-04T10:00:00.000Z',
       updated_at: '2026-04-04T10:00:00.000Z'
     });
@@ -61,6 +62,7 @@ describe('app identity mapping helpers', () => {
       customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
       agentLabel: null,
       isActive: true,
+      isDemo: false,
       createdAt: '2026-04-04T10:00:00.000Z',
       updatedAt: '2026-04-04T10:00:00.000Z'
     } satisfies AppUserRecord));
@@ -78,6 +80,7 @@ describe('app identity mapping helpers', () => {
       customerStorageId: null,
       agentLabel: 'Alex Chen',
       isActive: true,
+      isDemo: false,
       createdAt: '2026-04-04T10:00:00.000Z',
       updatedAt: '2026-04-04T10:00:00.000Z'
     } satisfies AppUserRecord));
@@ -104,6 +107,7 @@ describe('app identity mapping helpers', () => {
       customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
       agentLabel: null,
       isActive: false,
+      isDemo: false,
       createdAt: '2026-04-04T10:00:00.000Z',
       updatedAt: '2026-04-04T10:00:00.000Z'
     } satisfies AppUserRecord));
@@ -121,6 +125,7 @@ describe('app identity mapping helpers', () => {
       customerStorageId: null,
       agentLabel: 'Alex Chen',
       isActive: true,
+      isDemo: false,
       createdAt: '2026-04-04T10:00:00.000Z',
       updatedAt: '2026-04-04T10:00:00.000Z'
     } satisfies AppUserRecord));

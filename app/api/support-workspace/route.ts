@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireCustomerAuthContext, resolveAuthorizedCustomerId, resolveRequestAuthContext } from '@/lib/auth';
+import { requireCustomerAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { classifyCustomerRouteError, createCustomerRouteExecutionResolver } from '@/lib/customerRouteExecution';
 import { getClientVisibleErrorDetail } from '@/lib/security';
 import { toCustomerVisibleFile } from '@/lib/serializers';
@@ -33,12 +33,16 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'load') {
-      resolveAuthorizedCustomerId(authContext, body.customerId);
-      const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+      const { service, effectiveAuthContext, effectiveCustomerId } =
+        await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
         request,
         authContext
       );
-      const result = await service.loadCustomerWorkspace(authContext, body.profileUpdates);
+      const result = await service.loadCustomerWorkspace(
+        effectiveAuthContext,
+        body.profileUpdates,
+        effectiveCustomerId
+      );
       return NextResponse.json({
         ...result,
         file: toCustomerVisibleFile(result.file)
@@ -59,8 +63,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: saveProfileError }, { status: 400 });
       }
 
-      const authorizedCustomerId = resolveAuthorizedCustomerId(authContext, body.file.profile.customerId);
-      const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+      const { service, effectiveAuthContext, effectiveCustomerId } =
+        await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
         request,
         authContext
       );
@@ -69,21 +73,25 @@ export async function POST(request: Request) {
           ...body.file,
           profile: {
             ...body.file.profile,
-            customerId: authorizedCustomerId
+            customerId: effectiveCustomerId
           }
         },
-        authContext
+        effectiveAuthContext
       );
       return NextResponse.json({ file: toCustomerVisibleFile(file) } satisfies { file: CustomerVisibleFile });
     }
 
     if (body.action === 'reset') {
-      resolveAuthorizedCustomerId(authContext, body.customerId);
-      const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+      const { service, effectiveAuthContext, effectiveCustomerId } =
+        await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
         request,
         authContext
       );
-      const result = await service.resetCustomerWorkspace(authContext, body.profileUpdates);
+      const result = await service.resetCustomerWorkspace(
+        effectiveAuthContext,
+        body.profileUpdates,
+        effectiveCustomerId
+      );
       return NextResponse.json({
         ...result,
         file: toCustomerVisibleFile(result.file)
@@ -91,12 +99,16 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'start-new') {
-      resolveAuthorizedCustomerId(authContext, body.customerId);
-      const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+      const { service, effectiveAuthContext, effectiveCustomerId } =
+        await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
         request,
         authContext
       );
-      const file = await service.startNewCase(authContext, body.profileUpdates);
+      const file = await service.startNewCase(
+        effectiveAuthContext,
+        body.profileUpdates,
+        effectiveCustomerId
+      );
       return NextResponse.json({ file: toCustomerVisibleFile(file) } satisfies { file: CustomerVisibleFile });
     }
 
@@ -105,12 +117,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'caseId is required.' }, { status: 400 });
       }
 
-      resolveAuthorizedCustomerId(authContext, body.customerId);
-      const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+      const { service, effectiveAuthContext, effectiveCustomerId } =
+        await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
         request,
         authContext
       );
-      const result = await service.loadCustomerCase(body.caseId, authContext);
+      const result = await service.loadCustomerCase(body.caseId, effectiveAuthContext, effectiveCustomerId);
       return NextResponse.json({
         ...result,
         file: toCustomerVisibleFile(result.file)

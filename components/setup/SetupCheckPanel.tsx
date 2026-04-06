@@ -5,11 +5,22 @@ import Link from 'next/link';
 import { loadSetupCheck } from '@/lib/adminClient';
 import type { SetupCheckResult } from '@/lib/types';
 
-function CheckRow({ label, value }: { label: string; value: boolean }) {
+function CheckRow({
+  label,
+  value,
+  optional = false
+}: {
+  label: string;
+  value: boolean;
+  optional?: boolean;
+}) {
+  const text = optional ? (value ? 'Configured' : 'Optional') : value ? 'Ready' : 'Missing';
+  const className = value || optional ? 'setup-ok' : 'setup-fail';
+
   return (
     <div className="detail-list-row">
       <strong>{label}</strong>
-      <span className={value ? 'setup-ok' : 'setup-fail'}>{value ? 'Ready' : 'Missing'}</span>
+      <span className={className}>{text}</span>
     </div>
   );
 }
@@ -86,7 +97,7 @@ export function SetupCheckPanel() {
               <CheckRow label="DEMO_CUSTOMER_PASSWORD" value={result.env.demoCustomerPassword} />
               <CheckRow label="DEMO_AGENT_EMAIL" value={result.env.demoAgentEmail} />
               <CheckRow label="DEMO_AGENT_PASSWORD" value={result.env.demoAgentPassword} />
-              <CheckRow label="OPENAI_API_KEY" value={result.env.openAiKey} />
+              <CheckRow label="OPENAI_API_KEY (optional)" value={result.env.openAiKey} optional />
             </div>
           </section>
 
@@ -133,6 +144,15 @@ export function SetupCheckPanel() {
                 </article>
               ))}
             </div>
+            {result.advisories.length > 0 ? (
+              <div className="case-history-list" style={{ marginTop: 12 }}>
+                {result.advisories.map((detail) => (
+                  <article key={detail} className="case-history-card static-card">
+                    <p>{detail}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </section>
         </section>
       )}

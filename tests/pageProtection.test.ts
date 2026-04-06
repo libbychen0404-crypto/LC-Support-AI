@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthContext } from '../lib/types';
 
 const resolveServerAuthContextMock = vi.hoisted(() => vi.fn<() => Promise<AuthContext>>());
+const resolveServerAuthEntryModeMock = vi.hoisted(
+  () => vi.fn<() => Promise<'demo' | 'real' | null>>()
+);
 const redirectMock = vi.hoisted(() =>
   vi.fn((destination: string) => {
     throw new Error(`REDIRECT:${destination}`);
@@ -18,6 +21,10 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/lib/auth', () => ({
   resolveServerAuthContext: resolveServerAuthContextMock
+}));
+
+vi.mock('@/lib/authEntry', () => ({
+  resolveServerAuthEntryMode: resolveServerAuthEntryModeMock
 }));
 
 vi.mock('@/components/chat/ChatWorkspace', () => ({
@@ -76,6 +83,7 @@ describe('page protection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    resolveServerAuthEntryModeMock.mockResolvedValue(null);
   });
 
   it('redirects anonymous visitors away from /chat', async () => {

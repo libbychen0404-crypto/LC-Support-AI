@@ -15,11 +15,17 @@ import type { CustomerAuthContext, ResolvedCustomerAppIdentity, WorkspaceErrorCo
 export type CustomerRouteExecutionContext = SupportServiceExecutionContext & {
   privilege: 'user-scoped';
   authContext: CustomerAuthContext;
+  effectiveAuthContext: CustomerAuthContext;
+  effectiveCustomerId: string;
   appIdentity: ResolvedCustomerAppIdentity;
   userScopedContext: UserScopedSupabaseContext & {
     authContext: CustomerAuthContext;
     appIdentity: ResolvedCustomerAppIdentity;
   };
+};
+
+type CustomerExternalIdRow = {
+  external_customer_id: string | null;
 };
 
 type ResolveUserScopedContext = (
@@ -192,6 +198,32 @@ export function classifyCustomerRouteError(
 export function createCustomerRouteExecutionResolver(
   dependencies: CustomerRouteExecutionResolverDependencies = {}
 ) {
+  async function resolveEffectiveCustomerId(
+    userScopedContext: UserScopedSupabaseContext & {
+      authContext: CustomerAuthContext;
+      appIdentity: ResolvedCustomerAppIdentity;
+    }
+  ) {
+    if (userScopedContext.appIdentity.appUser.isDemo) {
+      return userScopedContext.authContext.customerId;
+    }
+
+    const { data, error } = await userScopedContext.supabase
+      .from('customers')
+      .select('external_customer_id')
+      .eq('id', userScopedContext.appIdentity.customerStorageId)
+      .maybeSingle<CustomerExternalIdRow>();
+
+    if (error || !data?.external_customer_id) {
+      throw new AppIdentityError(
+        'The signed-in customer mapping could not resolve to a valid customer profile.',
+        'identity_mapping_invalid'
+      );
+    }
+
+    return data.external_customer_id;
+  }
+
   async function resolveRequestCustomerRouteExecutionContext(
     request: Request,
     authContextOverride?: CustomerAuthContext
@@ -214,11 +246,22 @@ export function createCustomerRouteExecutionResolver(
     }
 
     const execution = createUserScopedSupportServiceExecutionContext(userScopedContext.supabase);
+    const effectiveCustomerId = await resolveEffectiveCustomerId({
+      ...userScopedContext,
+      authContext,
+      appIdentity: userScopedContext.appIdentity
+    });
+    const effectiveAuthContext: CustomerAuthContext = {
+      ...authContext,
+      customerId: effectiveCustomerId
+    };
 
     return {
       ...execution,
       privilege: 'user-scoped',
       authContext,
+      effectiveAuthContext,
+      effectiveCustomerId,
       appIdentity: userScopedContext.appIdentity,
       userScopedContext: {
         ...userScopedContext,

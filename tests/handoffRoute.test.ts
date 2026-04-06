@@ -57,15 +57,28 @@ function makeAgentCookie() {
   return `lc_support_session=${token}`;
 }
 
-function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
+function makeExecutionContext(
+  overrides: Partial<CustomerAuthContext> = {},
+  options: {
+    effectiveCustomerId?: string;
+    isDemo?: boolean;
+  } = {}
+) {
   const authContext: CustomerAuthContext = {
     ...CUSTOMER_AUTH,
     ...overrides
+  };
+  const effectiveCustomerId = options.effectiveCustomerId ?? authContext.customerId;
+  const effectiveAuthContext: CustomerAuthContext = {
+    ...authContext,
+    customerId: effectiveCustomerId
   };
 
   return {
     privilege: 'user-scoped' as const,
     authContext,
+    effectiveAuthContext,
+    effectiveCustomerId,
     appIdentity: {
       kind: 'customer' as const,
       authContext,
@@ -75,6 +88,7 @@ function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
         customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
         agentLabel: null,
         isActive: true,
+        isDemo: options.isDemo ?? false,
         createdAt: '2026-04-04T10:00:00.000Z',
         updatedAt: '2026-04-04T10:00:00.000Z'
       },
@@ -92,6 +106,7 @@ function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
           customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
           agentLabel: null,
           isActive: true,
+          isDemo: options.isDemo ?? false,
           createdAt: '2026-04-04T10:00:00.000Z',
           updatedAt: '2026-04-04T10:00:00.000Z'
         },
@@ -222,7 +237,8 @@ describe('handoff route guards', () => {
           isAuthenticated: true,
           role: 'customer',
           customerId: 'demo-customer-001'
-        })
+        }),
+        requestedCustomerId: 'demo-customer-001'
       })
     );
   });
@@ -276,7 +292,65 @@ describe('handoff route guards', () => {
     expect(payload.errorCode).toBe('supabase_access_token_missing');
   });
 
-  it('returns 403 when a signed-in customer forges another customerId in the handoff payload', async () => {
+  it('ignores a forged customerId in the handoff payload for a real customer', async () => {
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockResolvedValue(
+      makeExecutionContext(
+        {
+          customerId: 'stale-session-customer'
+        },
+        {
+          effectiveCustomerId: 'cust_real_001',
+          isDemo: false
+        }
+      )
+    );
+    serviceMocks.submitHandoffRequest.mockResolvedValue({
+      file: {
+        profile: {
+          customerId: 'cust_real_001',
+          name: 'Libby',
+          phone: '',
+          email: '',
+          lastSeenAt: new Date().toISOString()
+        },
+        activeCase: {
+          caseId: 'case-1',
+          issueType: 'Router Repair',
+          status: 'Pending Technician',
+          stage: 'case_processing',
+          escalationState: 'Escalated',
+          handoffStatus: 'Awaiting Human Review',
+          assignedHumanAgent: null,
+          handoffRequestedAt: new Date().toISOString(),
+          handoffContactMethod: 'Phone',
+          handoffCallbackWindow: 'Tomorrow 9am - 12pm',
+          handoffUrgencyReason: 'Need help',
+          handoffAdditionalDetails: '',
+          priority: 'Urgent',
+          assignedTo: 'Tier 2 Queue',
+          etaOrExpectedUpdateTime: null,
+          internalNote: 'Internal only',
+          resolutionNote: '',
+          caseNote: 'Internal compressed note',
+          customerUpdate: 'A specialist will review your case.',
+          problemStatement: 'Router is still down',
+          summary: 'Repair case summary',
+          nextAction: 'Awaiting human review.',
+          confirmed: true,
+          requiredFields: [],
+          pendingField: null,
+          collectedFields: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messages: [],
+          timeline: [],
+          isOpen: true
+        },
+        cases: []
+      },
+      existed: true
+    });
+
     const response = await POST(
       new Request('http://localhost/api/handoff', {
         method: 'POST',
@@ -291,9 +365,16 @@ describe('handoff route guards', () => {
       })
     );
 
-    expect(response.status).toBe(403);
-    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).not.toHaveBeenCalled();
-    expect(serviceMocks.submitHandoffRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).toHaveBeenCalledOnce();
+    expect(serviceMocks.submitHandoffRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authContext: expect.objectContaining({
+          customerId: 'cust_real_001'
+        }),
+        requestedCustomerId: 'cust_real_001'
+      })
+    );
   });
 
   it('returns 403 when the case ownership check fails during handoff submission', async () => {

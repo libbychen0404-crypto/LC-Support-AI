@@ -8,6 +8,7 @@ type AppUserRow = {
   customer_id: string | null;
   agent_label: string | null;
   is_active: boolean;
+  is_demo: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -35,6 +36,7 @@ export function mapAppUserRow(row: AppUserRow): AppUserRecord {
     customerStorageId: row.customer_id,
     agentLabel: row.agent_label,
     isActive: row.is_active,
+    isDemo: row.is_demo,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -44,7 +46,7 @@ export async function loadAppUserByAuthUserId(authUserId: string): Promise<AppUs
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from('app_users')
-    .select('auth_user_id, role, customer_id, agent_label, is_active, created_at, updated_at')
+    .select('auth_user_id, role, customer_id, agent_label, is_active, is_demo, created_at, updated_at')
     .eq('auth_user_id', authUserId)
     .maybeSingle<AppUserRow>();
 

@@ -48,15 +48,28 @@ function makeCustomerCookie(overrides: Partial<CustomerAuthContext> = {}) {
   return `lc_support_session=${token}`;
 }
 
-function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
+function makeExecutionContext(
+  overrides: Partial<CustomerAuthContext> = {},
+  options: {
+    effectiveCustomerId?: string;
+    isDemo?: boolean;
+  } = {}
+) {
   const authContext: CustomerAuthContext = {
     ...CUSTOMER_AUTH,
     ...overrides
+  };
+  const effectiveCustomerId = options.effectiveCustomerId ?? authContext.customerId;
+  const effectiveAuthContext: CustomerAuthContext = {
+    ...authContext,
+    customerId: effectiveCustomerId
   };
 
   return {
     privilege: 'user-scoped' as const,
     authContext,
+    effectiveAuthContext,
+    effectiveCustomerId,
     appIdentity: {
       kind: 'customer' as const,
       authContext,
@@ -66,6 +79,7 @@ function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
         customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
         agentLabel: null,
         isActive: true,
+        isDemo: options.isDemo ?? false,
         createdAt: '2026-04-04T10:00:00.000Z',
         updatedAt: '2026-04-04T10:00:00.000Z'
       },
@@ -83,6 +97,7 @@ function makeExecutionContext(overrides: Partial<CustomerAuthContext> = {}) {
           customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
           agentLabel: null,
           isActive: true,
+          isDemo: options.isDemo ?? false,
           createdAt: '2026-04-04T10:00:00.000Z',
           updatedAt: '2026-04-04T10:00:00.000Z'
         },
@@ -180,7 +195,8 @@ describe('support-workspace route', () => {
         role: 'customer',
         customerId: 'demo-customer-001'
       }),
-      { name: 'Libby' }
+      { name: 'Libby' },
+      'demo-customer-001'
     );
   });
 
@@ -232,7 +248,8 @@ describe('support-workspace route', () => {
         isAuthenticated: true,
         role: 'customer',
         customerId: 'demo-customer-001'
-      })
+      }),
+      'demo-customer-001'
     );
   });
 
@@ -261,7 +278,55 @@ describe('support-workspace route', () => {
         role: 'customer',
         customerId: 'demo-customer-001'
       }),
-      { name: 'Libby' }
+      { name: 'Libby' },
+      'demo-customer-001'
+    );
+  });
+
+  it('ignores a forged file.profile.customerId when a real customer saves the workspace', async () => {
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockResolvedValue(
+      makeExecutionContext(
+        {
+          customerId: 'stale-session-customer'
+        },
+        {
+          effectiveCustomerId: 'cust_real_001',
+          isDemo: false
+        }
+      )
+    );
+    const file = makeFile();
+    file.profile.customerId = 'demo-customer-999';
+    serviceMocks.saveCustomerWorkspace.mockResolvedValue({
+      ...file,
+      profile: {
+        ...file.profile,
+        customerId: 'cust_real_001'
+      }
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/support-workspace', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'save',
+          file
+        }),
+        headers: { 'Content-Type': 'application/json', cookie: makeCustomerCookie() }
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).toHaveBeenCalledOnce();
+    expect(serviceMocks.saveCustomerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          customerId: 'cust_real_001'
+        })
+      }),
+      expect.objectContaining({
+        customerId: 'cust_real_001'
+      })
     );
   });
 
@@ -287,7 +352,8 @@ describe('support-workspace route', () => {
         role: 'customer',
         customerId: 'demo-customer-001'
       }),
-      { name: 'Libby' }
+      { name: 'Libby' },
+      'demo-customer-001'
     );
   });
 
@@ -390,7 +456,23 @@ describe('support-workspace route', () => {
     expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when a signed-in customer forges another customerId in the payload before user-scoped execution runs', async () => {
+  it('ignores a forged customerId in the payload for a real customer and uses the derived identity', async () => {
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockResolvedValue(
+      makeExecutionContext(
+        {
+          customerId: 'stale-session-customer'
+        },
+        {
+          effectiveCustomerId: 'cust_real_001',
+          isDemo: false
+        }
+      )
+    );
+    serviceMocks.loadCustomerWorkspace.mockResolvedValue({
+      file: makeFile(),
+      existed: true
+    });
+
     const response = await POST(
       new Request('http://localhost/api/support-workspace', {
         method: 'POST',
@@ -402,13 +484,34 @@ describe('support-workspace route', () => {
       })
     );
 
-    expect(response.status).toBe(403);
-    const payload = (await response.json()) as { errorCode: string };
-    expect(payload.errorCode).toBe('forbidden');
-    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).toHaveBeenCalledOnce();
+    expect(serviceMocks.loadCustomerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: 'cust_real_001'
+      }),
+      undefined,
+      'cust_real_001'
+    );
   });
 
-  it('returns 403 when a signed-in customer forges another customerId while loading a case', async () => {
+  it('ignores a forged customerId while loading a case for a real customer', async () => {
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockResolvedValue(
+      makeExecutionContext(
+        {
+          customerId: 'stale-session-customer'
+        },
+        {
+          effectiveCustomerId: 'cust_real_001',
+          isDemo: false
+        }
+      )
+    );
+    serviceMocks.loadCustomerCase.mockResolvedValue({
+      file: makeFile(),
+      existed: true
+    });
+
     const response = await POST(
       new Request('http://localhost/api/support-workspace', {
         method: 'POST',
@@ -421,10 +524,53 @@ describe('support-workspace route', () => {
       })
     );
 
-    expect(response.status).toBe(403);
-    const payload = (await response.json()) as { errorCode: string };
-    expect(payload.errorCode).toBe('forbidden');
-    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(routeExecutionMocks.resolveRequestCustomerRouteExecutionContext).toHaveBeenCalledOnce();
+    expect(serviceMocks.loadCustomerCase).toHaveBeenCalledWith(
+      'case-1',
+      expect.objectContaining({
+        customerId: 'cust_real_001'
+      }),
+      'cust_real_001'
+    );
+  });
+
+  it('keeps the demo customer flow working with the existing external customer id contract', async () => {
+    routeExecutionMocks.resolveRequestCustomerRouteExecutionContext.mockResolvedValue(
+      makeExecutionContext(
+        {
+          customerId: 'demo-customer-001'
+        },
+        {
+          effectiveCustomerId: 'demo-customer-001',
+          isDemo: true
+        }
+      )
+    );
+    serviceMocks.loadCustomerWorkspace.mockResolvedValue({
+      file: makeFile(),
+      existed: true
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/support-workspace', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'load',
+          customerId: 'demo-customer-001'
+        }),
+        headers: { 'Content-Type': 'application/json', cookie: makeCustomerCookie() }
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceMocks.loadCustomerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: 'demo-customer-001'
+      }),
+      undefined,
+      'demo-customer-001'
+    );
   });
 
   it('returns 403 when the case does not belong to the signed-in customer', async () => {

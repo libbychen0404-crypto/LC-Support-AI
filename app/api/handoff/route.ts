@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireCustomerAuthContext, resolveAuthorizedCustomerId, resolveRequestAuthContext } from '@/lib/auth';
+import { requireCustomerAuthContext, resolveRequestAuthContext } from '@/lib/auth';
 import { classifyCustomerRouteError, createCustomerRouteExecutionResolver } from '@/lib/customerRouteExecution';
 import { getClientVisibleErrorDetail } from '@/lib/security';
 import { toCustomerVisibleFile } from '@/lib/serializers';
@@ -18,7 +18,6 @@ export async function POST(request: Request) {
       urgencyReason?: string;
       additionalDetails?: string;
     };
-    resolveAuthorizedCustomerId(authContext, body.customerId);
 
     if (!body.caseId) {
       return NextResponse.json({ error: 'Select a case before requesting human support.' }, { status: 400 });
@@ -34,7 +33,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { service } = await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
+    const { service, effectiveAuthContext, effectiveCustomerId } =
+      await customerRouteExecutionResolver.resolveRequestCustomerRouteExecutionContext(
       request,
       authContext
     );
@@ -47,7 +47,8 @@ export async function POST(request: Request) {
         urgencyReason: body.urgencyReason,
         additionalDetails: body.additionalDetails ?? ''
       },
-      authContext
+      authContext: effectiveAuthContext,
+      requestedCustomerId: effectiveCustomerId
     });
 
     return NextResponse.json({

@@ -1,4 +1,5 @@
 import { createAuthSessionToken, AUTH_SESSION_COOKIE_NAME } from './auth';
+import { getAuthEntryModeSignInCookieEntry, getAuthEntryModeSignOutCookieEntry } from './authEntry';
 import { loadAppUserByAuthUserId } from './appIdentity';
 import { getSupabaseServiceRoleClient, createSupabaseAnonClient, SUPABASE_USER_ACCESS_TOKEN_COOKIE_NAME } from './supabase';
 
@@ -330,7 +331,8 @@ export function getDemoSignInCookieEntries(result: DemoSessionResult) {
       name: SUPABASE_USER_ACCESS_TOKEN_COOKIE_NAME,
       value: result.supabaseAccessToken,
       options
-    }
+    },
+    getAuthEntryModeSignInCookieEntry('demo')
   ];
 }
 
@@ -347,6 +349,7 @@ export function getDemoSignOutCookieEntries() {
       name: SUPABASE_USER_ACCESS_TOKEN_COOKIE_NAME,
       value: '',
       options
-    }
+    },
+    getAuthEntryModeSignOutCookieEntry()
   ];
 }

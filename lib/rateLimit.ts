@@ -1,4 +1,9 @@
-type RateLimitRouteKey = 'demo-sign-in' | 'ai-reply' | 'ai-case-insights';
+type RateLimitRouteKey =
+  | 'demo-sign-in'
+  | 'ai-reply'
+  | 'ai-case-insights'
+  | 'auth-sign-up'
+  | 'auth-sign-in';
 
 type RateLimitConfig = {
   windowMs: number;
@@ -29,6 +34,14 @@ const RATE_LIMIT_CONFIGS: Record<RateLimitRouteKey, RateLimitConfig> = {
   'ai-case-insights': {
     windowMs: 5 * 60 * 1000,
     maxRequests: 5
+  },
+  'auth-sign-up': {
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 3
+  },
+  'auth-sign-in': {
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 8
   }
 };
 

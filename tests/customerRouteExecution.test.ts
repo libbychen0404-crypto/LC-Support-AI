@@ -14,8 +14,17 @@ const CUSTOMER_AUTH: CustomerAuthContext = {
 };
 
 describe('customer route execution resolver', () => {
-  it('builds a user-scoped service execution context from a mapped customer identity', async () => {
-    const fakeSupabase = { from: vi.fn() };
+  it('builds a user-scoped service execution context from a mapped real customer identity', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        external_customer_id: 'cust_real_001'
+      },
+      error: null
+    });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ select });
+    const fakeSupabase = { from };
     const resolver = createCustomerRouteExecutionResolver({
       resolveUserScopedContext: async () => ({
         privilege: 'user-scoped',
@@ -29,6 +38,7 @@ describe('customer route execution resolver', () => {
             customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
             agentLabel: null,
             isActive: true,
+            isDemo: false,
             createdAt: '2026-04-04T10:00:00.000Z',
             updatedAt: '2026-04-04T10:00:00.000Z'
           },
@@ -46,8 +56,48 @@ describe('customer route execution resolver', () => {
 
     expect(context.privilege).toBe('user-scoped');
     expect(context.authContext.customerId).toBe('demo-customer-001');
+    expect(context.effectiveCustomerId).toBe('cust_real_001');
+    expect(context.effectiveAuthContext.customerId).toBe('cust_real_001');
     expect(context.appIdentity.customerStorageId).toBe('9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54');
     expect(typeof context.service.loadCustomerWorkspace).toBe('function');
+    expect(from).toHaveBeenCalledWith('customers');
+  });
+
+  it('keeps the demo customer session id as the effective identity for demo mappings', async () => {
+    const from = vi.fn();
+    const fakeSupabase = { from };
+    const resolver = createCustomerRouteExecutionResolver({
+      resolveUserScopedContext: async () => ({
+        privilege: 'user-scoped',
+        authContext: CUSTOMER_AUTH,
+        appIdentity: {
+          kind: 'customer',
+          authContext: CUSTOMER_AUTH,
+          appUser: {
+            authUserId: CUSTOMER_AUTH.userId,
+            role: 'customer',
+            customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
+            agentLabel: null,
+            isActive: true,
+            isDemo: true,
+            createdAt: '2026-04-04T10:00:00.000Z',
+            updatedAt: '2026-04-04T10:00:00.000Z'
+          },
+          customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54'
+        },
+        accessToken: 'header.payload.signature',
+        supabase: fakeSupabase as never
+      })
+    });
+
+    const context = await resolver.resolveRequestCustomerRouteExecutionContext(
+      new Request('http://localhost'),
+      CUSTOMER_AUTH
+    );
+
+    expect(context.effectiveCustomerId).toBe('demo-customer-001');
+    expect(context.effectiveAuthContext.customerId).toBe('demo-customer-001');
+    expect(from).not.toHaveBeenCalled();
   });
 
   it('fails clearly if the resolved database identity is not a customer mapping', async () => {
@@ -70,6 +120,7 @@ describe('customer route execution resolver', () => {
             customerStorageId: null,
             agentLabel: 'Alex Chen',
             isActive: true,
+            isDemo: false,
             createdAt: '2026-04-04T10:00:00.000Z',
             updatedAt: '2026-04-04T10:00:00.000Z'
           }

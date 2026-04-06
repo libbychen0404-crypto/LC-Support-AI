@@ -29,6 +29,7 @@ describe('admin route execution resolver', () => {
             customerStorageId: null,
             agentLabel: 'Alex Chen',
             isActive: true,
+            isDemo: false,
             createdAt: '2026-04-04T10:00:00.000Z',
             updatedAt: '2026-04-04T10:00:00.000Z'
           }
@@ -69,6 +70,7 @@ describe('admin route execution resolver', () => {
             customerStorageId: '9a3cbc61-b2f9-4f5d-9f52-6da06bcf6f54',
             agentLabel: null,
             isActive: true,
+            isDemo: false,
             createdAt: '2026-04-04T10:00:00.000Z',
             updatedAt: '2026-04-04T10:00:00.000Z'
           },

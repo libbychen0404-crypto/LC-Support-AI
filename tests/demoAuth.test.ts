@@ -60,6 +60,7 @@ describe('demo auth foundation', () => {
       customerStorageId: 'cust-storage-1',
       agentLabel: null,
       isActive: true,
+      isDemo: true,
       createdAt: '2026-04-04T00:00:00.000Z',
       updatedAt: '2026-04-04T00:00:00.000Z'
     });
@@ -102,6 +103,7 @@ describe('demo auth foundation', () => {
       customerStorageId: null,
       agentLabel: 'Alex Chen',
       isActive: true,
+      isDemo: true,
       createdAt: '2026-04-04T00:00:00.000Z',
       updatedAt: '2026-04-04T00:00:00.000Z'
     });

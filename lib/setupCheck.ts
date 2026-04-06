@@ -73,7 +73,8 @@ export async function runSetupCheck(): Promise<SetupCheckResult> {
         demoSignInEnvReady: false
       },
       ready: false,
-      details: ['Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.']
+      details: ['Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.'],
+      advisories: []
     };
   }
 
@@ -107,6 +108,7 @@ export async function runSetupCheck(): Promise<SetupCheckResult> {
     : [0, 0, 0];
 
   const details: string[] = [];
+  const advisories: string[] = [];
 
   if (!customers) details.push('The customers table is missing required support columns.');
   if (!cases) {
@@ -126,7 +128,9 @@ export async function runSetupCheck(): Promise<SetupCheckResult> {
   if (!env.supabaseAnonKey) {
     details.push('SUPABASE_ANON_KEY is missing. User-scoped Supabase clients and future RLS-backed route execution cannot be enabled yet.');
   }
-  if (!env.openAiKey) details.push('OPENAI_API_KEY is missing. The app will fall back to deterministic support wording.');
+  if (!env.openAiKey) {
+    advisories.push('OPENAI_API_KEY is not configured. AI wording and case-insight generation will fall back to deterministic behavior.');
+  }
   if (!env.authSessionSecret) details.push('AUTH_SESSION_SECRET is missing. Auth session verification cannot be enabled yet.');
   if (!env.demoCustomerEmail || !env.demoCustomerPassword) {
     details.push('Demo customer sign-in is not configured yet. Add DEMO_CUSTOMER_EMAIL and DEMO_CUSTOMER_PASSWORD to .env.local.');
@@ -173,6 +177,7 @@ export async function runSetupCheck(): Promise<SetupCheckResult> {
       )
     },
     ready,
-    details
+    details,
+    advisories
   };
 }
