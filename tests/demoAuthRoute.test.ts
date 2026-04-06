@@ -37,10 +37,13 @@ describe('demo auth routes', () => {
     ]);
 
     const { POST } = await import('../app/api/demo-sign-in/route');
-    const formData = new FormData();
-    formData.set('role', 'customer');
-
-    const response = await POST(new Request('http://localhost:3000/api/demo-sign-in', { method: 'POST', body: formData }));
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'customer' })
+      })
+    );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost:3000/chat');
@@ -64,40 +67,53 @@ describe('demo auth routes', () => {
     ]);
 
     const { POST } = await import('../app/api/demo-sign-in/route');
-    const formData = new FormData();
-    formData.set('role', 'agent');
-
-    const response = await POST(new Request('http://localhost:3000/api/demo-sign-in', { method: 'POST', body: formData }));
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'agent' })
+      })
+    );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost:3000/admin');
   });
 
-  it('redirects customer sign-in failures back to the homepage with a clean demo error state', async () => {
+  it('returns a safe 500 JSON payload when customer sign-in fails', async () => {
     createDemoSessionMock.mockRejectedValue(new Error('failed'));
 
     const { POST } = await import('../app/api/demo-sign-in/route');
-    const formData = new FormData();
-    formData.set('role', 'customer');
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'customer' })
+      })
+    );
 
-    const response = await POST(new Request('http://localhost:3000/api/demo-sign-in', { method: 'POST', body: formData }));
-
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('http://localhost:3000/?demoError=demo_sign_in_failed&demoRole=customer');
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Unable to start demo session'
+    });
   });
 
-  it('redirects agent sign-in failures back to the homepage with a clean demo error state', async () => {
+  it('returns the same safe 403 JSON if the agent path somehow fails after the disabled check', async () => {
     vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', 'true');
-    createDemoSessionMock.mockRejectedValue(new Error('failed'));
+    createDemoSessionMock.mockRejectedValue(new Error('disabled'));
 
     const { POST } = await import('../app/api/demo-sign-in/route');
-    const formData = new FormData();
-    formData.set('role', 'agent');
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'agent' })
+      })
+    );
 
-    const response = await POST(new Request('http://localhost:3000/api/demo-sign-in', { method: 'POST', body: formData }));
-
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('http://localhost:3000/?demoError=demo_sign_in_failed&demoRole=agent');
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Agent demo disabled'
+    });
   });
 
   it('blocks the public agent demo entry when the production override is not enabled', async () => {
@@ -105,16 +121,51 @@ describe('demo auth routes', () => {
     vi.stubEnv('PUBLIC_AGENT_DEMO_ENTRY_ENABLED', '');
 
     const { POST } = await import('../app/api/demo-sign-in/route');
-    const formData = new FormData();
-    formData.set('role', 'agent');
-
-    const response = await POST(new Request('http://localhost:3000/api/demo-sign-in', { method: 'POST', body: formData }));
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'agent' })
+      })
+    );
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
       error: 'Agent demo disabled'
     });
     expect(createDemoSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for invalid roles', async () => {
+    const { POST } = await import('../app/api/demo-sign-in/route');
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' })
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Invalid role'
+    });
+  });
+
+  it('rejects non-JSON sign-in requests with a safe error', async () => {
+    const { POST } = await import('../app/api/demo-sign-in/route');
+    const response = await POST(
+      new Request('http://localhost:3000/api/demo-sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'role=customer'
+      })
+    );
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'JSON body required'
+    });
   });
 
   it('sign-out clears cookies and redirects home', async () => {

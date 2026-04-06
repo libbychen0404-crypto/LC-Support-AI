@@ -7,16 +7,36 @@ import {
 } from '@/lib/demoAuth';
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const rawRole = formData.get('role');
-  const role = typeof rawRole === 'string' ? rawRole : '';
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return NextResponse.json({ error: 'JSON body required' }, { status: 415 });
+  }
+
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const role =
+    typeof body === 'object' && body !== null && 'role' in body && typeof body.role === 'string'
+      ? body.role
+      : '';
 
   if (!isDemoEntryRole(role)) {
-    return NextResponse.redirect(new URL('/?demoError=demo_role_invalid', request.url));
+    return new Response(JSON.stringify({ error: 'Invalid role' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (process.env.PUBLIC_AGENT_DEMO_ENTRY_ENABLED !== 'true' && role === 'agent') {
-    return NextResponse.json({ error: 'Agent demo disabled' }, { status: 403 });
+    return new Response(JSON.stringify({ error: 'Agent demo disabled' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -31,13 +51,16 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorCode = getDemoSignInErrorCode(error);
 
-    if (errorCode === 'demo_role_disabled') {
-      return NextResponse.json({ error: 'Agent demo disabled' }, { status: 403 });
+    if (errorCode === 'demo_role_disabled' || role === 'agent') {
+      return new Response(JSON.stringify({ error: 'Agent demo disabled' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    const nextUrl = new URL('/', request.url);
-    nextUrl.searchParams.set('demoError', errorCode);
-    nextUrl.searchParams.set('demoRole', role);
-    return NextResponse.redirect(nextUrl);
+    return new Response(JSON.stringify({ error: 'Unable to start demo session' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
